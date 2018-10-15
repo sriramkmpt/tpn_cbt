@@ -26,6 +26,7 @@ module.exports = {
        .pause(browser.globals.QAenv.adm_delaytime)
        .click('@SubmitLogin')
        .pause(browser.globals.QAenv.adm_delaytime)
+
       // .pause(browser.globals.QAenv.adm_delaytime)
 
        },
