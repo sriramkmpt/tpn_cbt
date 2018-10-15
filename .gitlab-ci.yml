@@ -1,0 +1,64 @@
+# Build using the node8build image
+image: 310265785553.dkr.ecr.us-east-1.amazonaws.com/node10build:v7.0
+
+# Cache the node_modules/ folder between builds, as well as "untracked by Git" (build output) files
+# cache:
+#   untracked: true
+#   key: "$CI_BUILD_REF_NAME"
+#   paths:
+#     - node_modules/
+#     - output/
+
+before_script:
+  - env | grep ^PATH
+  - env | grep ^CI_
+
+stages:
+  - build
+  - test
+  - publish
+
+variables:
+  SERVICE_NAME: $CI_PROJECT_PATH_SLUG-$CI_COMMIT_REF_SLUG
+
+build:
+  stage: build
+  script:
+    - curl -X POST --data-urlencode "payload={\"text\":\"End to End Tests Started For $JIRA_TICKET\"}" $SLACK_HOOK_URL
+    # - rm -rf node_modules
+    # - npm install
+  tags:
+    - enssa-test
+  only:
+    - triggers
+
+test:
+  image: thapovan/chrome-headless-nodejs:latest
+  stage: test
+  script:
+  #  - rm -rf node_modules
+   - npm install
+   - echo $COMMAND
+   - echo $SLACK_HOOK_URL
+   - $COMMAND
+  tags:
+   - enssa-test
+  artifacts:
+   when: always
+   paths:
+     - output/
+  only:
+    - triggers
+
+publish:
+  stage: publish
+  dependencies:
+   - test
+  script:
+   - timestamp=$(date +%Y-%m-%d_%H%M%S)
+   - aws s3 sync output/ s3://enssa-report/enssa-app/$JIRA_TICKET/$timestamp/ --acl public-read --cache-control "public, max-age=60,must re-validate"
+   - curl -X POST --data-urlencode "payload={\"text\":\"End to End Test for $JIRA_TICKET completed, please use this link for the report $(cat TEST_STATUS).<https://s3.amazonaws.com/enssa-report/enssa-app/$JIRA_TICKET/$timestamp/reports/index.html|View Report>\"}" $SLACK_HOOK_URL
+  tags:
+   - enssa-test
+  only:
+   - triggers
